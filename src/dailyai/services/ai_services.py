@@ -113,8 +113,12 @@ class VisionService(AIService):
 
     async def process_frame(self, frame: Frame) -> AsyncGenerator[Frame, None]:
         if isinstance(frame, VisionImageFrame):
-            description = await self.run_vision(frame)
-            yield TextFrame(description)
+            if getattr(self, "run_vision_async"):
+                async for frame in self.run_vision_async(frame):
+                    yield frame
+            else:
+                description = await self.run_vision(frame)
+                yield TextFrame(description)
         else:
             yield frame
 
