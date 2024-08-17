@@ -55,6 +55,7 @@ together = [ "together~=1.2.7" ]
 websocket = [ "websockets~=12.0", "fastapi~=0.111.0" ]
 whisper = [ "faster-whisper~=1.0.3" ]
 xtts = [ "resampy~=0.4.3" ]
+noisereduce = [ "noisereduce~=3.0.2" ]
 
 [tool.setuptools.packages.find]
 # All the following settings are optional:
