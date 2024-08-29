@@ -25,6 +25,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+= `DeepgramSTTService` now has a mute during speech functionality. When the bot is 
+speeking, the user's audio is not transcribed and is thereby essentially muted.
+
+### Fixed
+
+### Other
+
+## [0.0.40] - 2024-08-20
+
+### Added
+
 - VAD parameters can now be dynamicallt updated using the
   `VADParamsUpdateFrame`.
 
