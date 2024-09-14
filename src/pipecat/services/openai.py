@@ -21,6 +21,8 @@ from pipecat.frames.frames import (
     Frame,
     FunctionCallInProgressFrame,
     FunctionCallResultFrame,
+    FunctionCallInProgressFrame,
+    FunctionCallResultFrame,
     LLMFullResponseEndFrame,
     LLMFullResponseStartFrame,
     LLMMessagesFrame,
@@ -28,6 +30,9 @@ from pipecat.frames.frames import (
     StartInterruptionFrame,
     TextFrame,
     TTSAudioRawFrame,
+    StartInterruptionFrame,
+    TextFrame,
+    TranscriptionFrame,
     TTSStartedFrame,
     TTSStoppedFrame,
     URLImageRawFrame,
@@ -43,7 +48,8 @@ from pipecat.processors.aggregators.openai_llm_context import (
     OpenAILLMContextFrame,
 )
 from pipecat.processors.frame_processor import FrameDirection
-from pipecat.services.ai_services import ImageGenService, LLMService, TTSService
+from pipecat.services.ai_services import ImageGenService, LLMService, STTService, TTSService
+from pipecat.utils.time import time_now_iso8601
 
 try:
     from openai import (
@@ -53,6 +59,7 @@ try:
         BadRequestError,
         DefaultAsyncHttpxClient,
     )
+    from openai.types.audio import Transcription
     from openai.types.chat import ChatCompletionChunk, ChatCompletionMessageParam
 except ModuleNotFoundError as e:
     logger.error(f"Exception: {e}")
@@ -401,6 +408,42 @@ class OpenAIImageGenService(ImageGenService):
             image = Image.open(image_stream)
             frame = URLImageRawFrame(image_url, image.tobytes(), image.size, image.format)
             yield frame
+
+
+class OpenAISTTService(STTService):
+    def __init__(
+        self,
+        *,
+        model: str = "whisper-1",
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self._model: str = model
+        self._client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+
+    async def run_stt(self, audio: bytes) -> AsyncGenerator[Frame, None]:
+        try:
+            await self.start_ttfb_metrics()
+
+            response: Transcription = await self._client.audio.transcriptions.create(
+                file=("audio.wav", audio, "audio/wav"), model=self._model
+            )
+
+            await self.stop_ttfb_metrics()
+
+            text = response.text.strip()
+
+            if text:
+                logger.debug(f"Transcription: [{text}]")
+                yield TranscriptionFrame(text, "", time_now_iso8601())
+            else:
+                logger.warning("Received empty transcription from API")
+
+        except Exception as e:
+            logger.exception(f"Exception during transcription: {e}")
+            yield ErrorFrame(f"Error during transcription: {str(e)}")
 
 
 class OpenAITTSService(TTSService):
