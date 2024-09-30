@@ -77,6 +77,18 @@ class OpenAIUnhandledFunctionException(Exception):
     pass
 
 
+@dataclass
+class OpenAIContextAggregatorPair:
+    _user: "OpenAIUserContextAggregator"
+    _assistant: "OpenAIAssistantContextAggregator"
+
+    def user(self) -> "OpenAIUserContextAggregator":
+        return self._user
+
+    def assistant(self) -> "OpenAIAssistantContextAggregator":
+        return self._assistant
+
+
 class BaseOpenAILLMService(LLMService):
     """This is the base for all services that use the AsyncOpenAI client.
 
@@ -117,6 +129,12 @@ class BaseOpenAILLMService(LLMService):
         self._temperature = params.temperature
         self._top_p = params.top_p
         self._extra = params.extra if isinstance(params.extra, dict) else {}
+
+    @staticmethod
+    def create_context_aggregator(context: OpenAILLMContext) -> OpenAIContextAggregatorPair:
+        user = OpenAIUserContextAggregator(context)
+        assistant = OpenAIAssistantContextAggregator(user)
+        return OpenAIContextAggregatorPair(_user=user, _assistant=assistant)
 
     def create_client(self, api_key=None, base_url=None, **kwargs):
         return AsyncOpenAI(
@@ -313,18 +331,6 @@ class BaseOpenAILLMService(LLMService):
             await self.push_frame(LLMFullResponseEndFrame())
 
 
-@dataclass
-class OpenAIContextAggregatorPair:
-    _user: "OpenAIUserContextAggregator"
-    _assistant: "OpenAIAssistantContextAggregator"
-
-    def user(self) -> "OpenAIUserContextAggregator":
-        return self._user
-
-    def assistant(self) -> "OpenAIAssistantContextAggregator":
-        return self._assistant
-
-
 class OpenAILLMService(BaseOpenAILLMService):
     def __init__(
         self,
@@ -334,12 +340,6 @@ class OpenAILLMService(BaseOpenAILLMService):
         **kwargs,
     ):
         super().__init__(model=model, params=params, **kwargs)
-
-    @staticmethod
-    def create_context_aggregator(context: OpenAILLMContext) -> OpenAIContextAggregatorPair:
-        user = OpenAIUserContextAggregator(context)
-        assistant = OpenAIAssistantContextAggregator(user)
-        return OpenAIContextAggregatorPair(_user=user, _assistant=assistant)
 
 
 class OpenAIImageGenService(ImageGenService):
