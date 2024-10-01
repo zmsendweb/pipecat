@@ -52,8 +52,6 @@ async def main():
 
         stt = OpenAISTTService(api_key=os.getenv("OPENAI_API_KEY"), model="whisper-1")
 
-        stt = OpenAISTTService(api_key=os.getenv("OPENAI_API_KEY"), model="whisper-1")
-
         tts = OpenAITTSService(api_key=os.getenv("OPENAI_API_KEY"), voice="alloy")
 
         llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
