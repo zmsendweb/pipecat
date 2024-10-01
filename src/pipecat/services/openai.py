@@ -7,8 +7,6 @@
 import base64
 import io
 import json
-import httpx
-import wave
 from dataclasses import dataclass
 from typing import Any, AsyncGenerator, Dict, List, Literal, Optional
 
@@ -16,13 +14,9 @@ import aiohttp
 import httpx
 from loguru import logger
 from PIL import Image
-from pydantic import BaseModel, Field
-
 from pipecat.frames.frames import (
     ErrorFrame,
     Frame,
-    FunctionCallInProgressFrame,
-    FunctionCallResultFrame,
     FunctionCallInProgressFrame,
     FunctionCallResultFrame,
     LLMFullResponseEndFrame,
@@ -31,10 +25,8 @@ from pipecat.frames.frames import (
     LLMUpdateSettingsFrame,
     StartInterruptionFrame,
     TextFrame,
-    TTSAudioRawFrame,
-    StartInterruptionFrame,
-    TextFrame,
     TranscriptionFrame,
+    TTSAudioRawFrame,
     TTSStartedFrame,
     TTSStoppedFrame,
     URLImageRawFrame,
@@ -50,8 +42,14 @@ from pipecat.processors.aggregators.openai_llm_context import (
     OpenAILLMContextFrame,
 )
 from pipecat.processors.frame_processor import FrameDirection
-from pipecat.services.ai_services import ImageGenService, LLMService, STTService, TTSService
+from pipecat.services.ai_services import (
+    ImageGenService,
+    LLMService,
+    SegmentedSTTService,
+    TTSService,
+)
 from pipecat.utils.time import time_now_iso8601
+from pydantic import BaseModel, Field
 
 try:
     from openai import (
@@ -412,7 +410,7 @@ class OpenAIImageGenService(ImageGenService):
             yield frame
 
 
-class OpenAISTTService(STTService):
+class OpenAISTTService(SegmentedSTTService):
     def __init__(
         self,
         *,
@@ -422,29 +420,18 @@ class OpenAISTTService(STTService):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self._model: str = model
+        self.set_model_name(model)
         self._client = AsyncOpenAI(api_key=api_key, base_url=base_url)
-        self._wave = None
 
-    def _ensure_wave_file(self):
-        if self._wave is None or self._wave._file is None:
-            logger.debug("Reinitializing wave file")
-            self._content = io.BytesIO()
-            self._wave = wave.open(self._content, "wb")
-            self._wave.setsampwidth(2)
-            self._wave.setnchannels(self._num_channels)
-            self._wave.setframerate(self._sample_rate)
-
-    async def _append_audio(self, frame: AudioRawFrame):
-        self._ensure_wave_file()
-        await super()._append_audio(frame)
+    async def set_model(self, model: str):
+        self.set_model_name(model)
 
     async def run_stt(self, audio: bytes) -> AsyncGenerator[Frame, None]:
         try:
             await self.start_ttfb_metrics()
 
             response: Transcription = await self._client.audio.transcriptions.create(
-                file=("audio.wav", audio, "audio/wav"), model=self._model
+                file=("audio.wav", audio, "audio/wav"), model=self.model_name
             )
 
             await self.stop_ttfb_metrics()
@@ -460,10 +447,6 @@ class OpenAISTTService(STTService):
         except Exception as e:
             logger.exception(f"Exception during transcription: {e}")
             yield ErrorFrame(f"Error during transcription: {str(e)}")
-        finally:
-            if self._wave:
-                self._wave.close()
-                self._wave = None
 
 
 class OpenAITTSService(TTSService):
