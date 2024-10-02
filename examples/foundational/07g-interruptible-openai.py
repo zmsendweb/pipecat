@@ -17,8 +17,7 @@ from pipecat.processors.aggregators.llm_response import (
     LLMAssistantResponseAggregator,
     LLMUserResponseAggregator,
 )
-from pipecat.services.openai import OpenAITTSService
-from pipecat.services.openai import OpenAILLMService
+from pipecat.services.openai import OpenAILLMService, OpenAISTTService, OpenAITTSService
 from pipecat.transports.services.daily import DailyParams, DailyTransport
 from pipecat.vad.silero import SileroVADAnalyzer
 
@@ -51,6 +50,8 @@ async def main():
             ),
         )
 
+        stt = OpenAISTTService(api_key=os.getenv("OPENAI_API_KEY"), model="whisper-1")
+
         tts = OpenAITTSService(api_key=os.getenv("OPENAI_API_KEY"), voice="alloy")
 
         llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
@@ -68,6 +69,7 @@ async def main():
         pipeline = Pipeline(
             [
                 transport.input(),  # Transport user input
+                stt,  # STT
                 tma_in,  # User responses
                 llm,  # LLM
                 tts,  # TTS
